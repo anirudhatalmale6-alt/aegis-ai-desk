@@ -1,12 +1,26 @@
 # AEGIS AI Desk — POC
 
-A serverless-style AI operations assistant for a company group. It reads tickets,
-categorizes and prioritizes them, remembers past solutions (RAG long-term memory),
-drafts responses for human approval, auto-drafts Knowledge Base articles for
-recurring issues, and books employee appointments with conflict checking.
+A **background** AI operations service for a company group. AEGIS is **not** a
+ticketing UI — your existing ticketing systems stay the front-end. It integrates
+via signed webhooks: it receives created tickets, categorizes/prioritizes them,
+remembers past solutions (RAG long-term memory), and pushes a suggested response
+back into your own ticket panel. Your staff approve inside your interface; on
+approval your system pings AEGIS to write the final resolution to memory (it
+learns). It also auto-drafts Knowledge Base articles for recurring issues and
+exposes a Google-Calendar-style scheduling API.
 
-Built as a proof-of-concept for the ticketing + scheduling + autonomous-knowledge
-vision, with a **human-in-the-loop approval gate** on every AI action.
+```
+your site --(webhook: ticket.created, signed)--> AEGIS --(Claude + RAG)--> suggestion
+     ^                                                                        |
+     |   (signed callback: ticket.suggestion) <-------------------------------+
+staff approve in YOUR panel
+     |
+     +--(webhook: ticket.resolved, signed)--> AEGIS writes resolution to memory
+```
+
+The bundled web app is an **Integration Console** that simulates one of your
+sites (left) and your ticket panel (right) so the whole round-trip is
+demonstrable without wiring your real systems yet.
 
 ## Architecture (production mapping)
 
@@ -45,17 +59,24 @@ Without a key the app runs fully on a local reasoner + local embeddings so you
 can test the entire flow immediately. With the key, Claude does the reasoning —
 same interface, same UI.
 
-## API (also the webhook surface)
+## Integration API
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/tickets` | Ingest a ticket → triage (categorize, RAG search, draft) |
-| POST | `/api/tickets/:id/approve` | Human approves → close → learn (write to memory) |
-| GET  | `/api/memory` | View long-term memory |
-| GET  | `/api/kb/candidates` | Recurring issues detected |
-| POST | `/api/kb/draft` | Auto-draft a KB article |
-| POST | `/api/calendar/book` | Book appointment (conflict-checked) |
-| GET  | `/api/health` | Status + active LLM/embeddings mode |
+Every webhook is authenticated with an **HMAC-SHA256** signature over the raw
+body + a timestamp (replay-protected, ±5 min). See `GET /api/v1/signature-helper`
+for a live signing example.
+
+| Direction | Path | Purpose |
+|-----------|------|---------|
+| your site → AEGIS | `POST /api/v1/tickets/ingest` | Ticket created → returns + pushes suggestion |
+| AEGIS → your panel | `POST {your callback_url}` | Signed `ticket.suggestion` callback |
+| your site → AEGIS | `POST /api/v1/tickets/resolve` | Staff approved → write resolution to memory |
+| read | `GET /api/memory`, `/api/deliveries` | Memory + outbound delivery audit log |
+| read | `GET /api/kb/candidates`, `POST /api/kb/draft` | Recurring issues + KB drafting |
+| API | `POST /api/calendar/book` | Book appointment (conflict-checked) |
+| read | `GET /api/health` | Status + active LLM/embeddings mode |
+
+Demo-only endpoints under `/mock/*` simulate a client site + panel so the
+console can drive the full round-trip locally.
 
 ## Status
 
