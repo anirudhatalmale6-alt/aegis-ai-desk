@@ -1,0 +1,49 @@
+{
+  "tickets": [
+    {
+      "id": "TKT-1001",
+      "subject": "Cannot log in - password reset not arriving",
+      "requester": "Sara M.",
+      "body": "I tried to reset my password but the reset email never arrives. I'm locked out of my account and can't access the portal.",
+      "category": "Access / Login",
+      "resolution": "Reset emails were landing in spam due to a DKIM misconfiguration. Whitelisted the no-reply sender and asked user to check spam. Password reset link is valid for 30 minutes - resend if expired."
+    },
+    {
+      "id": "TKT-1002",
+      "subject": "VPN keeps disconnecting every few minutes",
+      "requester": "Ahmed K.",
+      "body": "The VPN connection drops every 3-4 minutes and I have to reconnect constantly. It's slowing down my work.",
+      "category": "Network / VPN",
+      "resolution": "Caused by idle-timeout on the VPN gateway plus an outdated client. Updated the VPN client to the latest build and increased the idle timeout to 30 minutes. Stable since."
+    },
+    {
+      "id": "TKT-1003",
+      "subject": "Invoice shows wrong amount for March subscription",
+      "requester": "Finance Dept",
+      "body": "The March invoice charged us for 12 seats but we only have 9 active users. Please correct the billing.",
+      "category": "Billing",
+      "resolution": "Three deactivated seats were still counted due to a delayed sync. Reconciled the seat count, issued a credit note for the 3 extra seats, and enabled real-time seat sync."
+    },
+    {
+      "id": "TKT-1004",
+      "subject": "Password reset link says expired",
+      "requester": "Omar T.",
+      "body": "I requested a password reset but when I click the link it says the link has expired. Cannot log in.",
+      "category": "Access / Login",
+      "resolution": "Reset links expire after 30 minutes. Advised user to request a fresh link and complete the reset immediately. Confirmed access restored."
+    },
+    {
+      "id": "TKT-1005",
+      "subject": "Application crashes when exporting large report",
+      "requester": "Layla H.",
+      "body": "Every time I try to export a report with more than 5000 rows the application crashes with a 500 error.",
+      "category": "Bug / Error",
+      "resolution": "Export ran synchronously and hit a memory limit. Moved large exports to a background job with pagination; exports over 5000 rows now stream to a downloadable file."
+    }
+  ],
+  "employees": ["Dr. Nadia", "Eng. Yusuf", "Ms. Rana", "Mr. Karim"],
+  "calendar": [
+    { "id": "evt_0001", "employee": "Dr. Nadia", "title": "Team standup", "start": "2026-07-27T09:00:00", "end": "2026-07-27T09:30:00", "requester": "system", "status": "confirmed", "reminder": "15m before (auto)" },
+    { "id": "evt_0002", "employee": "Eng. Yusuf", "title": "Client onboarding call", "start": "2026-07-27T11:00:00", "end": "2026-07-27T12:00:00", "requester": "system", "status": "confirmed", "reminder": "15m before (auto)" }
+  ]
+}

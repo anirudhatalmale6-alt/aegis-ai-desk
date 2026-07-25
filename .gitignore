@@ -1,0 +1,8 @@
+node_modules/
+data/memory.json
+data/tickets.json
+data/calendar.json
+data/*.log
+data/shot*.png
+data/shots.py
+*.log

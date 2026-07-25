@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AEGIS AI Desk</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◈</span>
+    <div>
+      <h1>AEGIS AI Desk</h1>
+      <p class="tag">Serverless AI operations assistant · RAG memory · human-in-the-loop</p>
+    </div>
+  </div>
+  <div class="status" id="status">connecting…</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="triage">Ticket Triage</button>
+  <button class="tab" data-tab="memory">Memory</button>
+  <button class="tab" data-tab="kb">Knowledge Base</button>
+  <button class="tab" data-tab="schedule">Scheduling</button>
+</nav>
+
+<main>
+  <!-- TRIAGE -->
+  <section id="triage" class="panel active">
+    <div class="grid">
+      <div class="card">
+        <h2>New ticket</h2>
+        <p class="hint">Simulates an incoming ticket (webhook / API / email). The AI reads it, categorizes, searches memory, and drafts a reply — then waits for you.</p>
+        <label>Requester</label>
+        <input id="t-req" placeholder="e.g. Sara M." />
+        <label>Subject</label>
+        <input id="t-sub" placeholder="e.g. Cannot log in — reset email not arriving" />
+        <label>Message</label>
+        <textarea id="t-body" rows="4" placeholder="Describe the issue…"></textarea>
+        <div class="row">
+          <button class="primary" id="t-submit">Run AI triage</button>
+          <button class="ghost" id="t-sample">Load example</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Queue</h2>
+        <div id="queue" class="queue"><p class="empty">No tickets yet.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MEMORY -->
+  <section id="memory" class="panel">
+    <div class="card">
+      <h2>Long-term memory <span class="pill" id="mem-count">0</span></h2>
+      <p class="hint">Every closed ticket + resolution lives here. This is what the AI searches to "remember" past solutions. It grows as you approve tickets.</p>
+      <div id="mem-list" class="mem-list"></div>
+    </div>
+  </section>
+
+  <!-- KB -->
+  <section id="kb" class="panel">
+    <div class="grid">
+      <div class="card">
+        <h2>Recurring issues</h2>
+        <p class="hint">The AI watches memory for repeated problems and offers to write a Knowledge Base article automatically.</p>
+        <div id="kb-candidates"></div>
+      </div>
+      <div class="card">
+        <h2>Drafted articles</h2>
+        <div id="kb-articles"><p class="empty">No articles yet.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section id="schedule" class="panel">
+    <div class="grid">
+      <div class="card">
+        <h2>Book appointment</h2>
+        <p class="hint">Google Calendar-style scheduling with automatic conflict checking and reminders.</p>
+        <label>Employee</label>
+        <select id="s-emp"></select>
+        <label>Title</label>
+        <input id="s-title" placeholder="e.g. Onboarding review" />
+        <label>Start</label>
+        <input id="s-start" type="datetime-local" />
+        <label>End</label>
+        <input id="s-end" type="datetime-local" />
+        <button class="primary" id="s-book">Check &amp; book</button>
+        <div id="s-result"></div>
+      </div>
+      <div class="card">
+        <h2>Calendar</h2>
+        <div id="s-events"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
