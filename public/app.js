@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const api = (p, opts) => fetch(p, opts).then(r => r.json());
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const jpost = (p, b) => api(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
 
-// Tabs
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
@@ -11,68 +11,73 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   if (t.dataset.tab === 'memory') loadMemory();
   if (t.dataset.tab === 'kb') loadKB();
   if (t.dataset.tab === 'schedule') loadCalendar();
+  if (t.dataset.tab === 'api') loadApi();
 });
 
-// Health
-api('/api/health').then(h => {
-  const s = $('#status');
-  s.textContent = `● online · LLM: ${h.llm} · memory: ${h.memory}`;
-  s.classList.add('ok');
-}).catch(() => $('#status').textContent = 'offline');
+function refreshStatus() {
+  return api('/api/health').then(h => {
+    const s = $('#status');
+    s.textContent = `● online · LLM: ${h.llm} · memory: ${h.memory} · sites: ${h.sites.join(',')}`;
+    s.classList.add('ok');
+  }).catch(() => $('#status').textContent = 'offline');
+}
+refreshStatus();
 
-// ---- Triage ----
-const SAMPLE = {
-  requester: 'Mohammed R.',
-  subject: 'Locked out — password reset email never arrives',
-  body: 'I have been trying to reset my password for an hour. The reset email never shows up in my inbox and I am completely locked out. This is urgent, I have a deadline today.',
-};
-$('#t-sample').onclick = () => { $('#t-req').value = SAMPLE.requester; $('#t-sub').value = SAMPLE.subject; $('#t-body').value = SAMPLE.body; };
+// ---- Integration Flow ----
+const SAMPLE = { requester: 'Mohammed R.', subject: 'Locked out — password reset email never arrives',
+  body: 'I have been trying to reset my password for an hour. The reset email never arrives and I am completely locked out. Urgent — I have a deadline today.' };
+$('#f-sample').onclick = () => { $('#f-req').value = SAMPLE.requester; $('#f-sub').value = SAMPLE.subject; $('#f-body').value = SAMPLE.body; };
 
-$('#t-submit').onclick = async () => {
-  const subject = $('#t-sub').value.trim(), body = $('#t-body').value.trim();
-  if (!subject || !body) return alert('Subject and message are required.');
-  $('#t-submit').disabled = true; $('#t-submit').textContent = 'AI thinking…';
+let currentTicket = null;
+
+$('#f-send').onclick = async () => {
+  const subject = $('#f-sub').value.trim(), body = $('#f-body').value.trim();
+  if (!subject || !body) return alert('Subject and message required.');
+  const extId = 'EXT-' + Math.floor(Date.now() / 1000);
+  $('#f-send').disabled = true; $('#f-send').textContent = 'Signing & sending…';
+  $('#f-sent').innerHTML = `<div class="step">→ POST /api/v1/tickets/ingest<br><span class="dim">signed HMAC-SHA256 · ${extId}</span></div>`;
+  $('#f-aegis').innerHTML = '<span class="dim">verifying signature…<br>RAG search…<br>triage…</span>';
   try {
-    await api('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, body, requester: $('#t-req').value.trim() }) });
-    $('#t-sub').value = ''; $('#t-body').value = ''; $('#t-req').value = '';
-    loadQueue();
-  } finally { $('#t-submit').disabled = false; $('#t-submit').textContent = 'Run AI triage'; }
+    const r = await jpost('/mock/site/create-ticket', { external_ticket_id: extId, subject, body, requester: $('#f-req').value.trim() });
+    const s = r.suggestion;
+    currentTicket = { extId, subject, body, category: s.category };
+    const cites = (s.used_memory || []).map(m => `<b>${m.id}</b> (${(m.score * 100).toFixed(0)}%)`).join(', ') || 'none — new issue';
+    $('#f-aegis').innerHTML = `<div class="step ok">✓ signature verified</div>
+      <div class="badges"><span class="badge cat">${esc(s.category)}</span><span class="badge p-${s.priority}">${s.priority}</span></div>
+      <div class="dim">${esc(s.reasoning || '')}</div>
+      <div class="cites">learned from: ${cites}</div>
+      <div class="step ok">→ signed callback pushed to your panel</div>`;
+    await loadPanel();
+    refreshStatus();
+  } finally { $('#f-send').disabled = false; $('#f-send').textContent = 'Fire webhook → AEGIS'; }
 };
 
-async function loadQueue() {
-  const tickets = await api('/api/tickets');
-  const q = $('#queue');
-  if (!tickets.length) { q.innerHTML = '<p class="empty">No tickets yet.</p>'; return; }
-  q.innerHTML = tickets.map(renderTicket).join('');
-  q.querySelectorAll('[data-approve]').forEach(b => b.onclick = () => approve(b.dataset.approve));
+async function loadPanel() {
+  const panel = await api('/mock/panel');
+  if (!panel.length) { $('#f-panel').innerHTML = '<span class="empty">No suggestions received yet.</span>'; return; }
+  $('#f-panel').innerHTML = panel.slice(0, 4).map((p, i) => {
+    const s = p.suggestion;
+    const approvable = i === 0 && currentTicket && s.external_ticket_id === currentTicket.extId;
+    return `<div class="pcard">
+      <div class="from">${esc(s.external_ticket_id)} · ${p.verified ? '<span class="ver">✓ verified</span>' : '<span class="unver">unverified</span>'}</div>
+      <div class="subj">${esc(currentTicket && s.external_ticket_id === currentTicket.extId ? currentTicket.subject : s.category)}</div>
+      <div class="badges"><span class="badge cat">${esc(s.category)}</span><span class="badge p-${s.priority}">${s.priority}</span></div>
+      <div class="draft-mini">${esc(s.draft_response)}</div>
+      ${approvable ? `<button class="primary small" id="approve-btn">Staff approve → AEGIS learns</button>` : ''}
+    </div>`;
+  }).join('');
+  const btn = $('#approve-btn');
+  if (btn) btn.onclick = approve;
 }
 
-function renderTicket(t) {
-  const cites = (t.retrieved || []).map(r => `<b>${r.id}</b> (${r.subject || '—'}, ${(r.score * 100).toFixed(0)}%)`).join(', ');
-  const closed = t.status === 'closed';
-  return `<div class="ticket ${closed ? 'closed' : ''}">
-    <div class="head">
-      <div><div class="subj">${esc(t.subject)}</div><div class="from">${t.id} · from ${esc(t.requester)}</div></div>
-    </div>
-    <div class="badges">
-      <span class="badge cat">${esc(t.category)}</span>
-      <span class="badge p-${t.priority}">${t.priority}</span>
-      ${closed ? '<span class="badge tick-closed">✓ closed → saved to memory</span>' : ''}
-    </div>
-    <div class="reasoning">${esc(t.ai?.reasoning || '')}</div>
-    ${cites ? `<div class="cites">Learned from: ${cites}</div>` : '<div class="cites">No prior match — this will teach the AI once closed.</div>'}
-    <div class="draft" ${closed ? '' : 'contenteditable="true"'} id="draft-${t.id}">${esc(t.finalResponse || t.ai?.draft_response || '')}</div>
-    ${closed ? '' : `<div class="row"><button class="primary small" data-approve="${t.id}">Approve &amp; close (save to memory)</button></div>`}
-  </div>`;
-}
-
-async function approve(id) {
-  const resolution = $('#draft-' + id).innerText;
-  await api(`/api/tickets/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resolution }) });
-  loadQueue();
-  api('/api/health').then(h => { const s = $('#status'); s.textContent = `● online · LLM: ${h.llm} · memory: ${h.memory}`; });
+async function approve() {
+  const t = currentTicket;
+  const panel = await api('/mock/panel');
+  const resolution = panel[0]?.suggestion?.draft_response || 'Resolved.';
+  $('#approve-btn').disabled = true; $('#approve-btn').textContent = 'Writing to memory…';
+  const r = await jpost('/mock/site/resolve', { external_ticket_id: t.extId, resolution, category: t.category });
+  $('#f-panel').insertAdjacentHTML('afterbegin', `<div class="step ok">✓ resolved on your side → AEGIS memory now ${r.memory_size} items</div>`);
+  refreshStatus();
 }
 
 // ---- Memory ----
@@ -93,11 +98,10 @@ async function loadKB() {
     <div class="theme">${esc(c.theme)}</div>
     <div class="hint">Seen ${c.count} times · tickets: ${c.ids.join(', ')}</div>
     <button class="primary small" data-theme="${esc(c.theme)}">Auto-draft KB article</button>
-  </div>`).join('') : '<p class="empty">No recurring issues detected yet. Close a few similar tickets and they show up here.</p>';
+  </div>`).join('') : '<p class="empty">No recurring issues yet. Resolve a few similar tickets and they appear here.</p>';
   $('#kb-candidates').querySelectorAll('[data-theme]').forEach(b => b.onclick = async () => {
     b.disabled = true; b.textContent = 'Drafting…';
-    await api('/api/kb/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme: b.dataset.theme }) });
+    await jpost('/api/kb/draft', { theme: b.dataset.theme });
     loadKB();
   });
   $('#kb-articles').innerHTML = articles.length ? articles.map(a => `<div class="cand">
@@ -114,19 +118,24 @@ async function loadCalendar() {
   $('#s-events').innerHTML = data.events.length ? data.events.map(e => `<div class="event">
     <span class="emp">${esc(e.employee)}</span> — ${esc(e.title)}<br>
     ${new Date(e.start).toLocaleString()} → ${new Date(e.end).toLocaleTimeString()}<br>
-    <span class="hint">${e.status} · ${e.reminder}</span>
-  </div>`).join('') : '<p class="empty">No events.</p>';
+    <span class="hint">${e.status} · ${e.reminder}</span></div>`).join('') : '<p class="empty">No events.</p>';
 }
-
 $('#s-book').onclick = async () => {
-  const payload = { employee: $('#s-emp').value, title: $('#s-title').value,
-    start: $('#s-start').value, end: $('#s-end').value, requester: 'dashboard' };
+  const payload = { employee: $('#s-emp').value, title: $('#s-title').value, start: $('#s-start').value, end: $('#s-end').value, requester: 'api' };
   if (!payload.start || !payload.end) return alert('Pick start and end times.');
-  const r = await api('/api/calendar/book', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload) });
+  const r = await jpost('/api/calendar/book', payload);
   const box = $('#s-result');
-  if (r.ok) { box.className = 'ok-msg'; box.textContent = `✓ Booked ${r.event.id} · reminder set (${r.event.reminder})`; loadCalendar(); }
-  else { box.className = 'err-msg'; box.textContent = `✗ Conflict with: ${r.conflicts.map(c => c.title + ' (' + new Date(c.start).toLocaleTimeString() + ')').join(', ')}`; }
+  if (r.ok) { box.className = 'ok-msg'; box.textContent = `✓ Booked ${r.event.id} · reminder ${r.event.reminder}`; loadCalendar(); }
+  else { box.className = 'err-msg'; box.textContent = `✗ Conflict: ${r.conflicts.map(c => c.title + ' (' + new Date(c.start).toLocaleTimeString() + ')').join(', ')}`; }
 };
 
-loadQueue();
+// ---- API tab ----
+async function loadApi() {
+  const [helper, dels] = await Promise.all([api('/api/v1/signature-helper'), api('/api/deliveries')]);
+  $('#sig-helper').textContent = JSON.stringify(helper, null, 2);
+  $('#deliveries').innerHTML = dels.length ? dels.map(d => `<div class="event">
+    <span class="${d.ok ? 'ver' : 'unver'}">${d.ok ? '✓ delivered' : '✗ failed'}</span> ${esc(d.external_ticket_id || '')}
+    <span class="hint">→ ${esc(d.to)} · attempt ${d.attempt || d.attempts} · ${esc(d.at)}</span></div>`).join('') : '<p class="empty">No deliveries yet.</p>';
+}
+
+loadPanel();

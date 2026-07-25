@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AEGIS AI Desk</title>
+<title>AEGIS AI Desk — Integration Console</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -12,40 +12,54 @@
     <span class="logo">◈</span>
     <div>
       <h1>AEGIS AI Desk</h1>
-      <p class="tag">Serverless AI operations assistant · RAG memory · human-in-the-loop</p>
+      <p class="tag">Background integration service · webhooks + RAG · your ticketing stays the front-end</p>
     </div>
   </div>
   <div class="status" id="status">connecting…</div>
 </header>
 
 <nav class="tabs">
-  <button class="tab active" data-tab="triage">Ticket Triage</button>
+  <button class="tab active" data-tab="flow">Integration Flow</button>
   <button class="tab" data-tab="memory">Memory</button>
   <button class="tab" data-tab="kb">Knowledge Base</button>
   <button class="tab" data-tab="schedule">Scheduling</button>
+  <button class="tab" data-tab="api">API &amp; Security</button>
 </nav>
 
 <main>
-  <!-- TRIAGE -->
-  <section id="triage" class="panel active">
-    <div class="grid">
-      <div class="card">
-        <h2>New ticket</h2>
-        <p class="hint">Simulates an incoming ticket (webhook / API / email). The AI reads it, categorizes, searches memory, and drafts a reply — then waits for you.</p>
+  <!-- FLOW -->
+  <section id="flow" class="panel active">
+    <p class="flowline">This console simulates one of <b>your websites</b> on the left and <b>your existing ticket panel</b> on the right. AEGIS sits in the middle — it never becomes the front-end.</p>
+    <div class="flow3">
+      <!-- Column 1: your site -->
+      <div class="card col">
+        <div class="colhead">① Your website</div>
+        <p class="hint">A ticket is created on your site. Your backend fires a signed webhook to AEGIS.</p>
         <label>Requester</label>
-        <input id="t-req" placeholder="e.g. Sara M." />
+        <input id="f-req" placeholder="e.g. Sara M." />
         <label>Subject</label>
-        <input id="t-sub" placeholder="e.g. Cannot log in — reset email not arriving" />
+        <input id="f-sub" placeholder="Cannot log in — reset email not arriving" />
         <label>Message</label>
-        <textarea id="t-body" rows="4" placeholder="Describe the issue…"></textarea>
+        <textarea id="f-body" rows="3" placeholder="Describe the issue…"></textarea>
         <div class="row">
-          <button class="primary" id="t-submit">Run AI triage</button>
-          <button class="ghost" id="t-sample">Load example</button>
+          <button class="primary" id="f-send">Fire webhook → AEGIS</button>
+          <button class="ghost" id="f-sample">Example</button>
         </div>
+        <div id="f-sent" class="minilog"></div>
       </div>
-      <div class="card">
-        <h2>Queue</h2>
-        <div id="queue" class="queue"><p class="empty">No tickets yet.</p></div>
+
+      <!-- Column 2: AEGIS -->
+      <div class="card col aegis">
+        <div class="colhead">② AEGIS (background)</div>
+        <p class="hint">Verifies signature → RAG search → Claude triage → pushes a signed suggestion to your panel. No auto-actions.</p>
+        <div id="f-aegis" class="minilog"><span class="empty">Waiting for a ticket…</span></div>
+      </div>
+
+      <!-- Column 3: your panel -->
+      <div class="card col">
+        <div class="colhead">③ Your ticket panel</div>
+        <p class="hint">Your staff see the AI suggestion inside your existing interface and approve there. On approval, your system pings AEGIS to learn.</p>
+        <div id="f-panel" class="minilog"><span class="empty">No suggestions received yet.</span></div>
       </div>
     </div>
   </section>
@@ -54,7 +68,7 @@
   <section id="memory" class="panel">
     <div class="card">
       <h2>Long-term memory <span class="pill" id="mem-count">0</span></h2>
-      <p class="hint">Every closed ticket + resolution lives here. This is what the AI searches to "remember" past solutions. It grows as you approve tickets.</p>
+      <p class="hint">Every resolved ticket your system reports back lands here. This is what AEGIS searches to "remember" past solutions — it grows every time a ticket is approved on your side.</p>
       <div id="mem-list" class="mem-list"></div>
     </div>
   </section>
@@ -64,7 +78,7 @@
     <div class="grid">
       <div class="card">
         <h2>Recurring issues</h2>
-        <p class="hint">The AI watches memory for repeated problems and offers to write a Knowledge Base article automatically.</p>
+        <p class="hint">AEGIS watches memory for repeated problems and offers to auto-draft a Knowledge Base article for review.</p>
         <div id="kb-candidates"></div>
       </div>
       <div class="card">
@@ -79,15 +93,11 @@
     <div class="grid">
       <div class="card">
         <h2>Book appointment</h2>
-        <p class="hint">Google Calendar-style scheduling with automatic conflict checking and reminders.</p>
-        <label>Employee</label>
-        <select id="s-emp"></select>
-        <label>Title</label>
-        <input id="s-title" placeholder="e.g. Onboarding review" />
-        <label>Start</label>
-        <input id="s-start" type="datetime-local" />
-        <label>End</label>
-        <input id="s-end" type="datetime-local" />
+        <p class="hint">Google Calendar-style scheduling API your systems can call — conflict checking + reminders.</p>
+        <label>Employee</label><select id="s-emp"></select>
+        <label>Title</label><input id="s-title" placeholder="e.g. Onboarding review" />
+        <label>Start</label><input id="s-start" type="datetime-local" />
+        <label>End</label><input id="s-end" type="datetime-local" />
         <button class="primary" id="s-book">Check &amp; book</button>
         <div id="s-result"></div>
       </div>
@@ -95,6 +105,26 @@
         <h2>Calendar</h2>
         <div id="s-events"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- API -->
+  <section id="api" class="panel">
+    <div class="card">
+      <h2>Integration endpoints</h2>
+      <p class="hint">Two inbound webhooks + read APIs. Every webhook is authenticated with an HMAC-SHA256 signature over the raw body and a timestamp (replay-protected, ±5 min).</p>
+      <table class="apitbl">
+        <tr><th>Direction</th><th>Endpoint</th><th>Purpose</th></tr>
+        <tr><td>your site → AEGIS</td><td><code>POST /api/v1/tickets/ingest</code></td><td>Ticket created → returns + pushes suggestion (category, priority, draft, cited memory)</td></tr>
+        <tr><td>AEGIS → your panel</td><td><code>POST {your callback_url}</code></td><td>Signed <code>ticket.suggestion</code> callback into your interface</td></tr>
+        <tr><td>your site → AEGIS</td><td><code>POST /api/v1/tickets/resolve</code></td><td>Staff approved → AEGIS writes final resolution to memory (learns)</td></tr>
+        <tr><td>read</td><td><code>GET /api/memory</code>, <code>/api/deliveries</code></td><td>Memory + outbound delivery audit log</td></tr>
+      </table>
+      <h2 style="margin-top:18px">Live signature helper</h2>
+      <p class="hint">Exactly how to sign a request to AEGIS (values are live from the server):</p>
+      <pre class="kb" id="sig-helper">loading…</pre>
+      <h2 style="margin-top:18px">Delivery audit log</h2>
+      <div id="deliveries"><p class="empty">No deliveries yet.</p></div>
     </div>
   </section>
 </main>
