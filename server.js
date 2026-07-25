@@ -44,6 +44,16 @@ const SELF = `http://localhost:${PORT}`;
 const sites = new Map([
   ['demo-site', { secret: 'demo_shared_secret_change_me', callback_url: `${SELF}/mock/panel/callback` }],
 ]);
+// Real sites are configured via env: SITE_SECRET__<site_id> and SITE_CALLBACK__<site_id>.
+// Nothing sensitive is ever hard-coded — secrets live only in the environment.
+for (const [k, v] of Object.entries(process.env)) {
+  const m = k.match(/^SITE_SECRET__(.+)$/);
+  if (m && v) {
+    const id = m[1];
+    const existing = sites.get(id) || {};
+    sites.set(id, { ...existing, secret: v, callback_url: process.env[`SITE_CALLBACK__${id}`] || existing.callback_url });
+  }
+}
 
 // --- Structured store: exact facts (tickets + status) ---
 const TICKETS_PATH = join(DATA, 'tickets.json');

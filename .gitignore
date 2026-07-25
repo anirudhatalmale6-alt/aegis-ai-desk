@@ -6,3 +6,9 @@ data/*.log
 data/shot*.png
 data/shots.py
 *.log
+.env
+data/vid/
+data/*.mp4
+data/*.webm
+data/frame_*.png
+data/record.py
