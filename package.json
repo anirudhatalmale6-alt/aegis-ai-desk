@@ -1,12 +1,11 @@
 {
-  "name": "project",
-  "version": "1.0.0",
+  "name": "aegis-ai-desk",
+  "version": "0.1.0",
   "description": "Serverless-style AI operations assistant: RAG memory, ticket triage, KB generation, calendar scheduling with human-in-the-loop.",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "build": "node canary.js && tsc",
-    "prepare": "node canary.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
